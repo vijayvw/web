@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Deploy
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout Source Code
@@ -26,16 +26,12 @@ jobs:
       - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/test:${{ github.sha }}
-        
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
 
-      - name: Configure kubeconfig
+      - name: Verify Cluster Access
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          kubectl get nodes
 
-      - name: Deploy to Kubernetes
+      - name: Deploy Resources
         run: |
           kubectl apply -f deployment.yaml
           kubectl apply -f deployment-svc.yaml
@@ -43,4 +39,14 @@ jobs:
       - name: Update Deployment Image
         run: |
           kubectl set image deployment/login-page \
-          login-page=${{ secrets.DOCKER_USERNAME }}/test:${{ github.sha }}    
+          login-page=${{ secrets.DOCKER_USERNAME }}/test:${{ github.sha }}
+
+      - name: Wait for Rollout
+        run: |
+          kubectl rollout status deployment/login-page
+
+      - name: Verify Deployment
+        run: |
+          kubectl get deployments
+          kubectl get pods -o wide
+          kubectl get svc
