@@ -21,8 +21,26 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/test:login-page .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/test:${{ github.sha }} .
 
       - name: Push Docker Image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/test:login-page
+          docker push ${{ secrets.DOCKER_USERNAME }}/test:${{ github.sha }}
+        
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f deployment.yaml
+          kubectl apply -f deployment-svc.yaml
+
+      - name: Update Deployment Image
+        run: |
+          kubectl set image deployment/login-page \
+          login-page=${{ secrets.DOCKER_USERNAME }}/test:${{ github.sha }}    
